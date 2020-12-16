@@ -356,5 +356,26 @@ contract DssPsmTest is DSTest {
         assertTrue(lerp.done());
         assertEq(psmA.wards(address(lerp)), 0);
     }
+
+    function prove_lerp_tin(uint256 start, uint256 end, uint256 duration) public {
+        // Add reasonable constraints
+        if (duration > 100000000000) return;    // 100B seconds is around 3000 years
+        if (start > 10 ** 56) return;           // Max precision
+        if (end > 10 ** 56) return;             // Max precision
+
+        Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
+        psmA.rely(address(lerp));
+        lerp.init();
+
+        for (uint256 i = 0; i < 100; i++) {
+            hevm.warp(now + i);
+            lerp.tick();
+            assertTrue(start < end ?
+                psmA.tin() >= start && psmA.tin() <= end :
+                psmA.tin() >= end && psmA.tin() <= start
+            );
+            if (lerp.done()) break;
+        }
+    }
     
 }
