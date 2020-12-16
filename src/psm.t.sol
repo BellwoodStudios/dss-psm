@@ -357,17 +357,46 @@ contract DssPsmTest is DSTest {
         assertEq(psmA.wards(address(lerp)), 0);
     }
 
-    function prove_lerp_tin(uint256 start, uint256 end, uint256 duration) public {
+    function test_lerp_tin2() public {
+        uint256 start = 98079714638596607686304268564503364742204664601150226432;
+        uint256 end = 23179720751370058826883576990605360781399687168;
+        uint256 duration = 68719476736;
+
         // Add reasonable constraints
-        if (duration > 100000000000) return;    // 100B seconds is around 3000 years
-        if (start > 10 ** 56) return;           // Max precision
-        if (end > 10 ** 56) return;             // Max precision
+        if (duration == 0) return;                  // Disallowed by constructor
+        if (start == end) return;                   // Disallowed by constructor
+        if (duration > 100000000000) return;        // 100B seconds is around 3000 years
+        if (start > 10 ** 56) return;               // Max precision
+        if (end > 10 ** 56) return;                 // Max precision
 
         Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
         psmA.rely(address(lerp));
         lerp.init();
 
-        for (uint256 i = 0; i < 100; i++) {
+        for (uint256 i = 1; i <= 100; i++) {
+            hevm.warp(now + i);
+            lerp.tick();
+            assertTrue(start < end ?
+                psmA.tin() >= start && psmA.tin() <= end :
+                psmA.tin() >= end && psmA.tin() <= start
+            );
+            if (lerp.done()) break;
+        }
+    }
+
+    function prove_lerp_tin(uint256 start, uint256 end, uint256 duration) public {
+        // Add reasonable constraints
+        if (duration == 0) return;                  // Disallowed by constructor
+        if (start == end) return;                   // Disallowed by constructor
+        if (duration > 100000000000) return;        // 100B seconds is around 3000 years
+        if (start > 10 ** 56) return;               // Max precision
+        if (end > 10 ** 56) return;                 // Max precision
+
+        Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
+        psmA.rely(address(lerp));
+        lerp.init();
+
+        for (uint256 i = 1; i <= 100; i++) {
             hevm.warp(now + i);
             lerp.tick();
             assertTrue(start < end ?
