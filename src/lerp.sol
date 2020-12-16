@@ -62,7 +62,7 @@ contract Lerp {
         require(block.timestamp > startTime, "Lerp/no-time-elasped");
         require(!done, "Lerp/finished");
         if (block.timestamp < add(startTime, duration)) {
-            // 0 < t < 1
+            // 0 < t < WAD
             uint256 t = mul(WAD, sub(block.timestamp, startTime)) / duration;
             // y = (end - start) * t + start [Linear Interpolation]
             //   = end * t + start - start * t [Avoids overflow by moving the subtraction to the end]
