@@ -4,3 +4,6 @@
 [submodule "lib/dss"]
 	path = lib/dss
 	url = https://github.com/hexonaut/dss
+[submodule "lib/ds-test"]
+	path = lib/ds-test
+	url = https://github.com/dapphub/ds-test
