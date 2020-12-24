@@ -39,6 +39,8 @@ contract Lerp {
     constructor(address target_, bytes32 what_, uint256 start_, uint256 end_, uint256 duration_) public {
         require(duration_ != 0, "Lerp/no-zero-duration");
         require(start_ != end_, "Lerp/start-end-equal");
+        require(end <= uint256(-1) / (WAD - 1), "Lerp/end-too-large");
+        require(start + end <= uint256(-1), "Lerp/start-plus-end-too-large");
         target = FileLike(target_);
         what = what_;
         start = start_;
