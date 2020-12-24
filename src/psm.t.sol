@@ -98,6 +98,7 @@ contract DssPsmTest is DSTest {
 
     uint256 constant TOLL_ONE_PCT = 10 ** 16;
     uint256 constant USDX_WAD = 10 ** 6;
+    uint256 constant WAD = 10 ** 18;
 
     function ray(uint256 wad) internal pure returns (uint256) {
         return wad * 10 ** 9;
@@ -357,27 +358,25 @@ contract DssPsmTest is DSTest {
         assertEq(psmA.wards(address(lerp)), 0);
     }
 
-    function prove_lerp_tin(uint256 start, uint256 end, uint256 duration) public {
-        // Add reasonable constraints
-        if (duration == 0) return;                  // Disallowed by constructor
-        if (start == end) return;                   // Disallowed by constructor
-        if (duration > 100000000000) return;        // 100B seconds is around 3000 years
-        if (start > 10 ** 56) return;               // Max precision
-        if (end > 10 ** 56) return;                 // Max precision
+    function prove_lerp_bounds(uint256 start, uint256 end, uint256 duration, uint256 deltaTime) public {
+        // Add in all lerp constructor requirements
+        if (duration == 0) return;
+        if (duration > 365 days) return;
+        if (end > uint256(-1) / (WAD - 1)) return;
+        if (start > uint256(-1) - end) return;
 
-        Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
-        psmA.rely(address(lerp));
-        lerp.init();
+        // Run init
+        uint256 startTime = block.timestamp;
 
-        for (uint256 i = 1; i <= 100; i++) {
-            hevm.warp(now + i);
-            lerp.tick();
-            assertTrue(start < end ?
-                psmA.tin() >= start && psmA.tin() <= end :
-                psmA.tin() >= end && psmA.tin() <= start
-            );
-            if (lerp.done()) break;
-        }
+        // Add in tick requires
+        if (deltaTime >= duration) return;              // This is the case where we are done
+        if (deltaTime == 0) return;                     // This is the case where no time has elapsed
+        uint256 currentTime = startTime + deltaTime;    // startTime < currentTime < duration
+
+        uint256 t = WAD * (currentTime - startTime) / duration;
+        uint256 result = end * t / WAD + start - start * t / WAD;
+
+        assertTrue(result >= start && result <= end);
     }
     
 }
