@@ -11,6 +11,7 @@ import {Dai}              from "dss/dai.sol";
 
 import "./psm.sol";
 import "./join-5-auth.sol";
+import "./join-5.sol";
 import "./lerp.sol";
 
 interface Hevm {
