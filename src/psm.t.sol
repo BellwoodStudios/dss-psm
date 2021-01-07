@@ -8,8 +8,10 @@ import {Spotter}          from "dss/spot.sol";
 import {Vow}              from "dss/vow.sol";
 import {GemJoin, DaiJoin} from "dss/join.sol";
 import {Dai}              from "dss/dai.sol";
+import {Cat}              from "dss/cat.sol";
 
 import "./psm.sol";
+import "./psmflip.sol";
 import "./join-5-auth.sol";
 import "./join-5.sol";
 import "./lerp.sol";
@@ -87,9 +89,11 @@ contract DssPsmTest is DSTest {
     TestToken usdx;
     DaiJoin daiJoin;
     Dai dai;
+    Cat cat;
 
     AuthGemJoin5 gemA;
     DssPsm psmA;
+    PsmFlipper flip;
 
     GemJoin5 gemB;
 
@@ -102,6 +106,7 @@ contract DssPsmTest is DSTest {
 
     uint256 constant TOLL_ONE_PCT = 10 ** 16;
     uint256 constant USDX_WAD = 10 ** 6;
+    uint256 constant WAD = 10 ** 18;
 
     function ray(uint256 wad) internal pure returns (uint256) {
         return wad * 10 ** 9;
@@ -124,6 +129,13 @@ contract DssPsmTest is DSTest {
 
         vow = new TestVow(address(vat), address(0), address(0));
 
+        cat = new Cat(address(vat));
+        cat.file("vow", address(vow));
+        cat.file("box", rad(2000 ether));
+        cat.file(ilkNonPsm, "chop", 113 * WAD / 100);
+        cat.file(ilkNonPsm, "dunk", rad(50000 ether));
+        vat.rely(address(cat));
+
         usdx = new TestToken("USDX", 6);
         usdx.mint(1000 * USDX_WAD);
 
@@ -143,6 +155,9 @@ contract DssPsmTest is DSTest {
         psmA = new DssPsm(address(gemA), address(daiJoin), address(vow));
         gemA.rely(address(psmA));
         gemA.deny(me);
+
+        flip = new PsmFlipper(PsmLike(address(psmA)), address(cat));
+        cat.file(ilkNonPsm, "flip", address(flip));
 
         pip = new DSValue();
         pip.poke(bytes32(uint256(1 ether))); // Spot = $1
