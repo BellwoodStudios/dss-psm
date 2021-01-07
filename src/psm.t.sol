@@ -90,11 +90,14 @@ contract DssPsmTest is DSTest {
     AuthGemJoin5 gemA;
     DssPsm psmA;
 
+    GemJoin5 gemB;
+
     // CHEAT_CODE = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D
     bytes20 constant CHEAT_CODE =
         bytes20(uint160(uint256(keccak256('hevm cheat code'))));
 
-    bytes32 constant ilk = "usdx";
+    bytes32 constant ilk = "usdx-psm";
+    bytes32 constant ilkNonPsm = "usdx";
 
     uint256 constant TOLL_ONE_PCT = 10 ** 16;
     uint256 constant USDX_WAD = 10 ** 6;
@@ -128,6 +131,9 @@ contract DssPsmTest is DSTest {
         gemA = new AuthGemJoin5(address(vat), ilk, address(usdx));
         vat.rely(address(gemA));
 
+        gemB = new GemJoin5(address(vat), ilkNonPsm, address(usdx));
+        vat.rely(address(gemB));
+
         dai = new Dai(0);
         daiJoin = new DaiJoin(address(vat), address(dai));
         vat.rely(address(daiJoin));
@@ -144,8 +150,13 @@ contract DssPsmTest is DSTest {
         spot.file(ilk, bytes32("mat"), ray(1 ether));
         spot.poke(ilk);
 
+        spot.file(ilkNonPsm, bytes32("pip"), address(pip));
+        spot.file(ilkNonPsm, bytes32("mat"), ray(101 * (1 ether) / 100));
+        spot.poke(ilkNonPsm);
+
         vat.file(ilk, "line", rad(1000 ether));
-        vat.file("Line",      rad(1000 ether));
+        vat.file(ilkNonPsm, "line", rad(1000 ether));
+        vat.file("Line",      rad(2000 ether));
     }
 
     function test_sellGem_no_fee() public {
