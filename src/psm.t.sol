@@ -9,6 +9,7 @@ import {Vow}              from "dss/vow.sol";
 import {GemJoin, DaiJoin} from "dss/join.sol";
 import {Dai}              from "dss/dai.sol";
 import {Cat}              from "dss/cat.sol";
+import {Jug}              from "dss/jug.sol";
 
 import "./psm.sol";
 import "./psmflip.sol";
@@ -90,6 +91,7 @@ contract DssPsmTest is DSTest {
     DaiJoin daiJoin;
     Dai dai;
     Cat cat;
+    Jug jug;
 
     AuthGemJoin5 gemA;
     DssPsm psmA;
@@ -124,6 +126,9 @@ contract DssPsmTest is DSTest {
         vat = new TestVat();
         vat = vat;
 
+        vat.init(ilk);
+        vat.init(ilkNonPsm);
+
         spot = new Spotter(address(vat));
         vat.rely(address(spot));
 
@@ -135,11 +140,15 @@ contract DssPsmTest is DSTest {
         cat.file(ilkNonPsm, "chop", 113 * WAD / 100);
         cat.file(ilkNonPsm, "dunk", rad(50000 ether));
         vat.rely(address(cat));
+        vow.rely(address(cat));
+
+        jug = new Jug(address(vat));
+        jug.init(ilkNonPsm);
+        jug.file(ilkNonPsm, "duty", 1000000003022265980097387650);  // 10% SF
+        vat.rely(address(jug));
 
         usdx = new TestToken("USDX", 6);
         usdx.mint(1000 * USDX_WAD);
-
-        vat.init(ilk);
 
         gemA = new AuthGemJoin5(address(vat), ilk, address(usdx));
         vat.rely(address(gemA));
@@ -173,6 +182,11 @@ contract DssPsmTest is DSTest {
         vat.file(ilk, "line", rad(1000 ether));
         vat.file(ilkNonPsm, "line", rad(1000 ether));
         vat.file("Line",      rad(2000 ether));
+
+        assertEq(address(flip.psm()), address(psmA));
+        assertEq(address(flip.vat()), address(vat));
+        assertEq(flip.ilk(), ilk);
+        assertEq(address(flip.cat()), address(cat));
     }
 
     function test_sellGem_no_fee() public {
@@ -383,5 +397,35 @@ contract DssPsmTest is DSTest {
         assertTrue(lerp.done());
         assertEq(psmA.wards(address(lerp)), 0);
     }
+
+    function test_psm_flip_overcollateralized() public {
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+
+        (uint256 ink1, uint256 art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink1, 102 ether);
+        assertEq(art1, 100 ether);
+        (uint256 ink2, uint256 art2) = vat.urns(ilkNonPsm, address(psmA));
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+
+        hevm.warp(now + 60 days);       // 2 months @ 10% = between 100% and 101% CR (overcollateralized, but below the LR)
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);
+
+        (ink1, art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        (ink2, art2) = vat.urns(ilkNonPsm, address(psmA));
+        assertEq(ink2, 100 ether);
+        assertEq(art2, 100 ether);
+
+        assertEq(vow.Joy(), rad(2 ether));
+    }
+
+    // TODO
+    // - test psm flip undercollateralized
+    // - test psm flip - psm has no debt ceiling available
     
 }
