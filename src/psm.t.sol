@@ -163,10 +163,13 @@ contract DssPsmTest is DSTest {
 
         psmA = new DssPsm(address(gemA), address(daiJoin), address(vow));
         gemA.rely(address(psmA));
-        gemA.deny(me);
 
-        flip = new PsmFlipper(PsmLike(address(psmA)), address(cat));
+        flip = new PsmFlipper(address(cat), GemJoinAbstract(address(gemB)), PsmLike(address(psmA)));
         cat.file(ilkNonPsm, "flip", address(flip));
+        flip.rely(address(cat));
+        psmA.hope(address(flip));
+        gemA.rely(address(flip));
+        cat.rely(address(flip));
 
         pip = new DSValue();
         pip.poke(bytes32(uint256(1 ether))); // Spot = $1
@@ -183,9 +186,13 @@ contract DssPsmTest is DSTest {
         vat.file(ilkNonPsm, "line", rad(1000 ether));
         vat.file("Line",      rad(2000 ether));
 
+        gemA.deny(me);
+
         assertEq(address(flip.psm()), address(psmA));
+        assertEq(address(flip.gemJoin()), address(gemB));
         assertEq(address(flip.vat()), address(vat));
-        assertEq(flip.ilk(), ilk);
+        assertEq(flip.ilk(), ilkNonPsm);
+        assertEq(flip.psmIlk(), ilk);
         assertEq(address(flip.cat()), address(cat));
     }
 
@@ -406,7 +413,7 @@ contract DssPsmTest is DSTest {
         (uint256 ink1, uint256 art1) = vat.urns(ilkNonPsm, me);
         assertEq(ink1, 102 ether);
         assertEq(art1, 100 ether);
-        (uint256 ink2, uint256 art2) = vat.urns(ilkNonPsm, address(psmA));
+        (uint256 ink2, uint256 art2) = vat.urns(ilk, address(psmA));
         assertEq(ink2, 0 ether);
         assertEq(art2, 0 ether);
 
@@ -417,15 +424,16 @@ contract DssPsmTest is DSTest {
         (ink1, art1) = vat.urns(ilkNonPsm, me);
         assertEq(ink2, 0 ether);
         assertEq(art2, 0 ether);
-        (ink2, art2) = vat.urns(ilkNonPsm, address(psmA));
-        assertEq(ink2, 100 ether);
-        assertEq(art2, 100 ether);
+        (ink2, art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 102 ether);
+        assertEq(art2, 102 ether);
 
-        assertEq(vow.Joy(), rad(2 ether));
+        assertEq(vow.Joy() - vow.Awe(), rad(2 ether));
     }
 
     // TODO
     // - test psm flip undercollateralized
     // - test psm flip - psm has no debt ceiling available
+    // - test psm flip - dust
     
 }

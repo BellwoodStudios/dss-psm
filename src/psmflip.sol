@@ -2,10 +2,17 @@ pragma solidity ^0.6.7;
 
 import { CatAbstract } from "dss-interfaces/dss/CatAbstract.sol";
 import { VatAbstract } from "dss-interfaces/dss/VatAbstract.sol";
+import { GemJoinAbstract } from "dss-interfaces/dss/GemJoinAbstract.sol";
+import { GemAbstract } from "dss-interfaces/ERC/GemAbstract.sol";
 
 interface PsmLike {
     function vat() external view returns (address);
+    function gemJoin() external view returns (address);
     function ilk() external view returns (bytes32);
+}
+
+interface AuthGemJoinLike {
+    function join(address urn, uint256 wad, address _msgSender) external;
 }
 
 // PSM Flipper
@@ -20,10 +27,17 @@ contract PsmFlipper {
     modifier auth { require(wards[msg.sender] == 1); _; }
 
     VatAbstract immutable public vat;
-    address immutable public psm;
-    bytes32 immutable public ilk;
     CatAbstract immutable public cat;
+
+    GemJoinAbstract public gemJoin;
+    bytes32 immutable public ilk;
+
+    address immutable public psm;
+    AuthGemJoinLike immutable psmGemJoin;
+    bytes32 immutable public psmIlk;
+
     uint256 public kicks = 0;
+    uint256 immutable internal to18ConversionFactor;
 
     // --- Events ---
     event Rely(address indexed usr);
@@ -38,13 +52,19 @@ contract PsmFlipper {
     );
 
     // --- Init ---
-    constructor(PsmLike psm_, address cat_) public {
+    constructor(address cat_, GemJoinAbstract gemJoin_, PsmLike psm_) public {
+        require(gemJoin_.gem() == GemJoinAbstract(psm_.gemJoin()).gem(), "PsmFlipper/gems-dont-match");
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
         psm = address(psm_);
         vat = VatAbstract(psm_.vat());
-        ilk = psm_.ilk();
         cat = CatAbstract(cat_);
+        gemJoin = gemJoin_;
+        ilk = gemJoin_.ilk();
+        psmGemJoin = AuthGemJoinLike(psm_.gemJoin());
+        psmIlk = psm_.ilk();
+        to18ConversionFactor = 10 ** (18 - gemJoin_.dec());
+        GemAbstract(gemJoin_.gem()).approve(psm_.gemJoin(), uint256(-1));
     }
 
     // --- Kick ---
@@ -54,8 +74,18 @@ contract PsmFlipper {
         require(kicks < uint256(-1), "PsmFlipper/overflow");
         id = ++kicks;
 
-        vat.frob(ilk, psm, address(msg.sender), address(gal), int256(lot), int256(lot));
+        // TODO - deal with the dust?
+        uint256 gems = lot / to18ConversionFactor;
+        uint256 rad = lot * (18 ** 27);
+        vat.flux(ilk, msg.sender, address(this), lot);
+        gemJoin.exit(address(this), gems);
+        psmGemJoin.join(psm, gems, address(this));
+        vat.frob(psmIlk, psm, psm, address(gal), int256(lot), int256(lot));
         cat.claw(tab);
+        if (rad > tab) {
+            // Send any leftovers to gal
+            //vat.move(psm, gal, rad - tab);
+        }
 
         emit Kick(id, lot, bid, tab, usr, gal);
     }
