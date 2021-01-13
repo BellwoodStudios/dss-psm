@@ -76,16 +76,11 @@ contract PsmFlipper {
 
         // TODO - deal with the dust?
         uint256 gems = lot / to18ConversionFactor;
-        uint256 rad = lot * (18 ** 27);
         vat.flux(ilk, msg.sender, address(this), lot);
         gemJoin.exit(address(this), gems);
         psmGemJoin.join(psm, gems, address(this));
         vat.frob(psmIlk, psm, psm, address(gal), int256(lot), int256(lot));
         cat.claw(tab);
-        if (rad > tab) {
-            // Send any leftovers to gal
-            //vat.move(psm, gal, rad - tab);
-        }
 
         emit Kick(id, lot, bid, tab, usr, gal);
     }

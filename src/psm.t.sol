@@ -143,6 +143,7 @@ contract DssPsmTest is DSTest {
         vow.rely(address(cat));
 
         jug = new Jug(address(vat));
+        jug.file("vow", address(vow));
         jug.init(ilkNonPsm);
         jug.file(ilkNonPsm, "duty", 1000000003022265980097387650);  // 10% SF
         vat.rely(address(jug));
@@ -416,9 +417,11 @@ contract DssPsmTest is DSTest {
         (uint256 ink2, uint256 art2) = vat.urns(ilk, address(psmA));
         assertEq(ink2, 0 ether);
         assertEq(art2, 0 ether);
+        assertEq(vow.Joy() - vow.Awe(), rad(0 ether));
 
         hevm.warp(now + 60 days);       // 2 months @ 10% = between 100% and 101% CR (overcollateralized, but below the LR)
         jug.drip(ilkNonPsm);
+        assertEq(vow.Joy() - vow.Awe(), 1579080444319131458969819300000000000000000000);        // ~1.57% fee over 2 months
         cat.bite(ilkNonPsm, me);
 
         (ink1, art1) = vat.urns(ilkNonPsm, me);
