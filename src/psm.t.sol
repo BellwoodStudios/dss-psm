@@ -434,9 +434,45 @@ contract DssPsmTest is DSTest {
         assertEq(vow.Joy() - vow.Awe(), rad(2 ether));
     }
 
+    function test_psm_flip_undercollateralized() public {
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+
+        (uint256 ink1, uint256 art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink1, 102 ether);
+        assertEq(art1, 100 ether);
+        (uint256 ink2, uint256 art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        assertEq(vow.Joy() - vow.Awe(), rad(0 ether));
+
+        hevm.warp(now + 90 days);       // 3 months @ 10% = between 99% and 100% CR (undercollateralized)
+        jug.drip(ilkNonPsm);
+        assertEq(vow.Joy() - vow.Awe(), 2377946808564888043406647900000000000000000000);        // ~2.38% fee over 3 months
+        cat.bite(ilkNonPsm, me);
+
+        (ink1, art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        (ink2, art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 102 ether);
+        assertEq(art2, 102 ether);
+
+        assertEq(vow.Joy() - vow.Awe(), rad(2 ether));
+    }
+
+    function testFail_psm_flip_no_dc() public {
+        vat.file(ilk, "line", rad(0 ether));        // 0 DC
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+        hevm.warp(now + 60 days);       // 2 months @ 10% = between 100% and 101% CR (overcollateralized, but below the LR)
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);        // Fail here
+    }
+
     // TODO
-    // - test psm flip undercollateralized
-    // - test psm flip - psm has no debt ceiling available
     // - test psm flip - dust
     
 }
