@@ -54,16 +54,26 @@ contract PsmFlipper {
     // --- Init ---
     constructor(address cat_, GemJoinAbstract gemJoin_, PsmLike psm_) public {
         require(gemJoin_.gem() == GemJoinAbstract(psm_.gemJoin()).gem(), "PsmFlipper/gems-dont-match");
+        require(gemJoin_.dec() <= 18, "PsmFlipper/dec-too-high");
+
+        // Give admin rights to contract creator
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
-        psm = address(psm_);
+
+        // Add contract refs and cache as much into immutable variables as possible to save gas
         vat = VatAbstract(psm_.vat());
         cat = CatAbstract(cat_);
+
         gemJoin = gemJoin_;
         ilk = gemJoin_.ilk();
+
+        psm = address(psm_);
         psmGemJoin = AuthGemJoinLike(psm_.gemJoin());
         psmIlk = psm_.ilk();
+
         to18ConversionFactor = 10 ** (18 - gemJoin_.dec());
+
+        // Infinite approval to save gas in kick
         GemAbstract(gemJoin_.gem()).approve(psm_.gemJoin(), uint256(-1));
     }
 
