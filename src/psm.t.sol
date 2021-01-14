@@ -358,25 +358,45 @@ contract DssPsmTest is DSTest {
         assertEq(psmA.wards(address(lerp)), 0);
     }
 
-    function prove_lerp_bounds(uint256 start, uint256 end, uint256 duration, uint256 deltaTime) public {
-        // Add in all lerp constructor requirements
+    function test_lerp_max_values() public {
+        // Reduce to reasonable numbers
+        uint256 start = 10 ** 59;
+        uint256 end = 10 ** 59 - 1;
+        uint256 duration = 365 days;
+        uint256 deltaTime = 365 days - 1;   // This will set t at it's max value just under 1 WAD
+
+        Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
+        psmA.rely(address(lerp));
+        lerp.init();
+        hevm.warp(now + deltaTime);
+        lerp.tick();
+        uint256 tin = psmA.tin();
+        uint256 low = end > start ? start : end;
+        uint256 high = end > start ? end : start;
+        assertTrue(tin >= low && tin <= high);
+    }
+
+    function test_lerp_bounds_fuzz(uint256 start, uint256 end, uint256 duration, uint256 deltaTime) public {
+        // Reduce to reasonable numbers
+        start = start % 10 ** 59;
+        end = end % 10 ** 59;
+        duration = duration % (365 days);
+        deltaTime = deltaTime % (500 days);
+
+        // Constructor revert cases
+        if (start == end) return;
         if (duration == 0) return;
-        if (duration > 365 days) return;
-        if (end > uint256(-1) / (WAD - 1)) return;
-        if (start > uint256(-1) - end) return;
+        if (deltaTime == 0) return;
 
-        // Run init
-        uint256 startTime = block.timestamp;
-
-        // Add in tick requires
-        if (deltaTime >= duration) return;              // This is the case where we are done
-        if (deltaTime == 0) return;                     // This is the case where no time has elapsed
-        uint256 currentTime = startTime + deltaTime;    // startTime < currentTime < duration
-
-        uint256 t = WAD * (currentTime - startTime) / duration;
-        uint256 result = end * t / WAD + start - start * t / WAD;
-
-        assertTrue(result >= start && result <= end);
+        Lerp lerp = new Lerp(address(psmA), "tin", start, end, duration);
+        psmA.rely(address(lerp));
+        lerp.init();
+        hevm.warp(now + deltaTime);
+        lerp.tick();
+        uint256 tin = psmA.tin();
+        uint256 low = end > start ? start : end;
+        uint256 high = end > start ? end : start;
+        assertTrue(tin >= low && tin <= high);
     }
     
 }

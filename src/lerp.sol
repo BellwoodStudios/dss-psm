@@ -39,8 +39,10 @@ contract Lerp {
     constructor(address target_, bytes32 what_, uint256 start_, uint256 end_, uint256 duration_) public {
         require(duration_ != 0, "Lerp/no-zero-duration");
         require(duration_ <= 365 days, "Lerp/max-duration-one-year");
-        require(end_ <= uint256(-1) / (WAD - 1), "Lerp/end-too-large");
-        require(start_ <= uint256(-1) - end_, "Lerp/start-too-large");
+        // This is not the exact upper bound, but it's a practical one
+        // Ballparked from 2^256 / 10^18 and verified that this is less than that value
+        require(start_ <= 10 ** 59, "Lerp/start-too-large");
+        require(end_ <= 10 ** 59, "Lerp/end-too-large");
         target = FileLike(target_);
         what = what_;
         start = start_;
@@ -61,14 +63,15 @@ contract Lerp {
 
     function tick() external {
         require(started, "Lerp/not-started");
-        require(block.timestamp > startTime, "Lerp/no-time-elasped");
+        require(block.timestamp > startTime, "Lerp/no-time-elapsed");
         require(!done, "Lerp/finished");
         if (block.timestamp < add(startTime, duration)) {
+            // All bounds are constrained in the constructor so no need for safe-math
             // 0 <= t < WAD
-            uint256 t = mul(WAD, sub(block.timestamp, startTime)) / duration;
+            uint256 t = (block.timestamp - startTime) * WAD / duration;
             // y = (end - start) * t + start [Linear Interpolation]
             //   = end * t + start - start * t [Avoids overflow by moving the subtraction to the end]
-            target.file(what, sub(add(mul(end, t) / WAD, start), mul(start, t) / WAD));
+            target.file(what, end * t / WAD + start - start * t / WAD);
         } else {
             // Set the end value and de-auth yourself
             target.file(what, end);
