@@ -370,10 +370,7 @@ contract DssPsmTest is DSTest {
         lerp.init();
         hevm.warp(now + deltaTime);
         lerp.tick();
-        uint256 tin = psmA.tin();
-        uint256 low = end > start ? start : end;
-        uint256 high = end > start ? end : start;
-        assertTrue(tin >= low && tin <= high);
+        assertEq(psmA.tin(), end);
     }
 
     function test_lerp_bounds_fuzz(uint256 start, uint256 end, uint256 duration, uint256 deltaTime) public {

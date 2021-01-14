@@ -16,15 +16,6 @@ contract Lerp {
     modifier auth { require(wards[msg.sender] == 1); _; }
 
     uint256 constant WAD = 10 ** 18;
-    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x + y) >= x);
-    }
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x);
-    }
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
 
     FileLike immutable public target;
     bytes32 immutable public what;
@@ -65,7 +56,7 @@ contract Lerp {
         require(started, "Lerp/not-started");
         require(block.timestamp > startTime, "Lerp/no-time-elapsed");
         require(!done, "Lerp/finished");
-        if (block.timestamp < add(startTime, duration)) {
+        if (block.timestamp < startTime + duration) {
             // All bounds are constrained in the constructor so no need for safe-math
             // 0 <= t < WAD
             uint256 t = (block.timestamp - startTime) * WAD / duration;
