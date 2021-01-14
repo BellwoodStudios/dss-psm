@@ -84,12 +84,13 @@ contract PsmFlipper {
         require(kicks < uint256(-1), "PsmFlipper/overflow");
         id = ++kicks;
 
-        // TODO - deal with the dust?
-        uint256 gems = lot / to18ConversionFactor;
         vat.flux(ilk, msg.sender, address(this), lot);
-        gemJoin.exit(address(this), gems);
-        psmGemJoin.join(psm, gems, address(this));
-        vat.frob(psmIlk, psm, psm, address(gal), int256(lot), int256(lot));
+        // Use the gems available (instead of lot) to move over dust as it accumulates
+        uint256 amt = vat.gem(ilk, address(this)) / to18ConversionFactor;
+        int256 gems = int256(amt * to18ConversionFactor);
+        gemJoin.exit(address(this), amt);
+        psmGemJoin.join(psm, amt, address(this));
+        vat.frob(psmIlk, psm, psm, address(gal), gems, gems);
         cat.claw(tab);
 
         emit Kick(id, lot, bid, tab, usr, gal);

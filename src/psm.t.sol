@@ -472,7 +472,39 @@ contract DssPsmTest is DSTest {
         cat.bite(ilkNonPsm, me);        // Fail here
     }
 
-    // TODO
-    // - test psm flip - dust
+    function test_psm_flip_dust() public {
+        uint256 dust = 5 * 10 ** 11;    // Half of the dust amount between 10^18 (gems) and 10^6 (usdx decimals)
+        uint256 usdxAmount = 102 ether - dust;
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, int256(usdxAmount), 100 ether);
+        hevm.warp(now + 60 days);
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);
+
+        // Only the rounded down amount should be collected into the psm with the dust in the flipper
+        assertEq(vat.gem(ilkNonPsm, address(flip)), dust);
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(psmA));
+        assertEq(ink, 101999999 * 10 ** 12);
+        assertEq(art, 101999999 * 10 ** 12);
+
+        // Do it again
+        gemB.join(me, 102 * USDX_WAD);
+        (,uint256 rate,,,) = vat.ilks(ilkNonPsm);
+        vat.frob(ilkNonPsm, me, me, me, int256(usdxAmount), int256(100 ether * 10 ** 27 / rate));
+        hevm.warp(now + 60 days);
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);
+
+        // Two half dusts should add up to a full extra gem
+        // PSM Vault Debt should equal 101999999 * 2 [two times the single vault amount] + 1 [both dust halves]
+        assertEq(vat.gem(ilkNonPsm, address(flip)), 0);
+        (ink, art) = vat.urns(ilk, address(psmA));
+        assertEq(ink, 203999999 * 10 ** 12);
+        assertEq(art, 203999999 * 10 ** 12);
+
+        // Note: the important part is the rad() section, the rest is a rounding error from art -> dai conversion
+        assertEq(vow.Joy() - vow.Awe(), rad(3999999 * 10 ** 12) + 429585964851248040052110724);
+    }
     
 }
