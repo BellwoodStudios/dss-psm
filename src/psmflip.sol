@@ -87,7 +87,7 @@ contract PsmFlipper {
         vat.flux(ilk, msg.sender, address(this), lot);
         // Use the gems available (instead of lot) to move over dust as it accumulates
         uint256 amt = vat.gem(ilk, address(this)) / to18ConversionFactor;
-        int256 gems = int256(amt * to18ConversionFactor);
+        int256 gems = int256(amt * to18ConversionFactor);   // No need for safe-mul because just reversing the previous operation
         gemJoin.exit(address(this), amt);
         psmGemJoin.join(psm, amt, address(this));
         vat.frob(psmIlk, psm, psm, address(gal), gems, gems);
