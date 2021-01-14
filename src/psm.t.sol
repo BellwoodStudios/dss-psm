@@ -8,9 +8,13 @@ import {Spotter}          from "dss/spot.sol";
 import {Vow}              from "dss/vow.sol";
 import {GemJoin, DaiJoin} from "dss/join.sol";
 import {Dai}              from "dss/dai.sol";
+import {Cat}              from "dss/cat.sol";
+import {Jug}              from "dss/jug.sol";
 
 import "./psm.sol";
+import "./psmflip.sol";
 import "./join-5-auth.sol";
+import "./join-5.sol";
 import "./lerp.sol";
 
 interface Hevm {
@@ -86,18 +90,25 @@ contract DssPsmTest is DSTest {
     TestToken usdx;
     DaiJoin daiJoin;
     Dai dai;
+    Cat cat;
+    Jug jug;
 
     AuthGemJoin5 gemA;
     DssPsm psmA;
+    PsmFlipper flip;
+
+    GemJoin5 gemB;
 
     // CHEAT_CODE = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D
     bytes20 constant CHEAT_CODE =
         bytes20(uint160(uint256(keccak256('hevm cheat code'))));
 
-    bytes32 constant ilk = "usdx";
+    bytes32 constant ilk = "usdx-psm";
+    bytes32 constant ilkNonPsm = "usdx";
 
     uint256 constant TOLL_ONE_PCT = 10 ** 16;
     uint256 constant USDX_WAD = 10 ** 6;
+    uint256 constant WAD = 10 ** 18;
 
     function ray(uint256 wad) internal pure returns (uint256) {
         return wad * 10 ** 9;
@@ -115,18 +126,36 @@ contract DssPsmTest is DSTest {
         vat = new TestVat();
         vat = vat;
 
+        vat.init(ilk);
+        vat.init(ilkNonPsm);
+
         spot = new Spotter(address(vat));
         vat.rely(address(spot));
 
         vow = new TestVow(address(vat), address(0), address(0));
 
+        cat = new Cat(address(vat));
+        cat.file("vow", address(vow));
+        cat.file("box", rad(2000 ether));
+        cat.file(ilkNonPsm, "chop", 113 * WAD / 100);
+        cat.file(ilkNonPsm, "dunk", rad(50000 ether));
+        vat.rely(address(cat));
+        vow.rely(address(cat));
+
+        jug = new Jug(address(vat));
+        jug.file("vow", address(vow));
+        jug.init(ilkNonPsm);
+        jug.file(ilkNonPsm, "duty", 1000000003022265980097387650);  // 10% SF
+        vat.rely(address(jug));
+
         usdx = new TestToken("USDX", 6);
         usdx.mint(1000 * USDX_WAD);
 
-        vat.init(ilk);
-
         gemA = new AuthGemJoin5(address(vat), ilk, address(usdx));
         vat.rely(address(gemA));
+
+        gemB = new GemJoin5(address(vat), ilkNonPsm, address(usdx));
+        vat.rely(address(gemB));
 
         dai = new Dai(0);
         daiJoin = new DaiJoin(address(vat), address(dai));
@@ -135,7 +164,13 @@ contract DssPsmTest is DSTest {
 
         psmA = new DssPsm(address(gemA), address(daiJoin), address(vow));
         gemA.rely(address(psmA));
-        gemA.deny(me);
+
+        flip = new PsmFlipper(address(cat), GemJoinAbstract(address(gemB)), PsmLike(address(psmA)));
+        cat.file(ilkNonPsm, "flip", address(flip));
+        flip.rely(address(cat));
+        psmA.hope(address(flip));
+        gemA.rely(address(flip));
+        cat.rely(address(flip));
 
         pip = new DSValue();
         pip.poke(bytes32(uint256(1 ether))); // Spot = $1
@@ -144,8 +179,22 @@ contract DssPsmTest is DSTest {
         spot.file(ilk, bytes32("mat"), ray(1 ether));
         spot.poke(ilk);
 
+        spot.file(ilkNonPsm, bytes32("pip"), address(pip));
+        spot.file(ilkNonPsm, bytes32("mat"), ray(101 * (1 ether) / 100));
+        spot.poke(ilkNonPsm);
+
         vat.file(ilk, "line", rad(1000 ether));
-        vat.file("Line",      rad(1000 ether));
+        vat.file(ilkNonPsm, "line", rad(1000 ether));
+        vat.file("Line",      rad(2000 ether));
+
+        gemA.deny(me);
+
+        assertEq(address(flip.psm()), address(psmA));
+        assertEq(address(flip.gemJoin()), address(gemB));
+        assertEq(address(flip.vat()), address(vat));
+        assertEq(flip.ilk(), ilkNonPsm);
+        assertEq(flip.psmIlk(), ilk);
+        assertEq(address(flip.cat()), address(cat));
     }
 
     function test_sellGem_no_fee() public {
@@ -355,6 +404,107 @@ contract DssPsmTest is DSTest {
         assertEq(psmA.tin(), 1 * TOLL_ONE_PCT / 10);    // 0.1%
         assertTrue(lerp.done());
         assertEq(psmA.wards(address(lerp)), 0);
+    }
+
+    function test_psm_flip_overcollateralized() public {
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+
+        (uint256 ink1, uint256 art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink1, 102 ether);
+        assertEq(art1, 100 ether);
+        (uint256 ink2, uint256 art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        assertEq(vow.Joy() - vow.Awe(), rad(0 ether));
+
+        hevm.warp(now + 60 days);       // 2 months @ 10% = between 100% and 101% CR (overcollateralized, but below the LR)
+        jug.drip(ilkNonPsm);
+        assertEq(vow.Joy() - vow.Awe(), 1579080444319131458969819300000000000000000000);        // ~1.57% fee over 2 months
+        cat.bite(ilkNonPsm, me);
+
+        (ink1, art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        (ink2, art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 102 ether);
+        assertEq(art2, 102 ether);
+
+        assertEq(vow.Joy() - vow.Awe(), rad(2 ether));
+    }
+
+    function test_psm_flip_undercollateralized() public {
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+
+        (uint256 ink1, uint256 art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink1, 102 ether);
+        assertEq(art1, 100 ether);
+        (uint256 ink2, uint256 art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        assertEq(vow.Joy() - vow.Awe(), rad(0 ether));
+
+        hevm.warp(now + 90 days);       // 3 months @ 10% = between 99% and 100% CR (undercollateralized)
+        jug.drip(ilkNonPsm);
+        assertEq(vow.Joy() - vow.Awe(), 2377946808564888043406647900000000000000000000);        // ~2.38% fee over 3 months
+        cat.bite(ilkNonPsm, me);
+
+        (ink1, art1) = vat.urns(ilkNonPsm, me);
+        assertEq(ink2, 0 ether);
+        assertEq(art2, 0 ether);
+        (ink2, art2) = vat.urns(ilk, address(psmA));
+        assertEq(ink2, 102 ether);
+        assertEq(art2, 102 ether);
+
+        assertEq(vow.Joy() - vow.Awe(), rad(2 ether));
+    }
+
+    function testFail_psm_flip_no_dc() public {
+        vat.file(ilk, "line", rad(0 ether));        // 0 DC
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, 102 ether, 100 ether);
+        hevm.warp(now + 60 days);       // 2 months @ 10% = between 100% and 101% CR (overcollateralized, but below the LR)
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);        // Fail here
+    }
+
+    function test_psm_flip_dust() public {
+        uint256 dust = 5 * 10 ** 11;    // Half of the dust amount between 10^18 (gems) and 10^6 (usdx decimals)
+        uint256 usdxAmount = 102 ether - dust;
+        usdx.approve(address(gemB));
+        gemB.join(me, 102 * USDX_WAD);
+        vat.frob(ilkNonPsm, me, me, me, int256(usdxAmount), 100 ether);
+        hevm.warp(now + 60 days);
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);
+
+        // Only the rounded down amount should be collected into the psm with the dust in the flipper
+        assertEq(vat.gem(ilkNonPsm, address(flip)), dust);
+        (uint256 ink, uint256 art) = vat.urns(ilk, address(psmA));
+        assertEq(ink, 101999999 * 10 ** 12);
+        assertEq(art, 101999999 * 10 ** 12);
+
+        // Do it again
+        gemB.join(me, 102 * USDX_WAD);
+        (,uint256 rate,,,) = vat.ilks(ilkNonPsm);
+        vat.frob(ilkNonPsm, me, me, me, int256(usdxAmount), int256(100 ether * 10 ** 27 / rate));
+        hevm.warp(now + 60 days);
+        jug.drip(ilkNonPsm);
+        cat.bite(ilkNonPsm, me);
+
+        // Two half dusts should add up to a full extra gem
+        // PSM Vault Debt should equal 101999999 * 2 [two times the single vault amount] + 1 [both dust halves]
+        assertEq(vat.gem(ilkNonPsm, address(flip)), 0);
+        (ink, art) = vat.urns(ilk, address(psmA));
+        assertEq(ink, 203999999 * 10 ** 12);
+        assertEq(art, 203999999 * 10 ** 12);
+
+        // Note: the important part is the rad() section, the rest is a rounding error from art -> dai conversion
+        assertEq(vow.Joy() - vow.Awe(), rad(3999999 * 10 ** 12) + 429585964851248040052110724);
     }
     
 }
