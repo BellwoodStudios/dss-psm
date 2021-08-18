@@ -16,7 +16,7 @@ TOKEN=$3
 PIP=$4
 
 # Build everything
-dapp --use solc:0.6.7 build
+dapp --use solc:0.6.12 build
 
 echo "Deploying contracts..."
 
@@ -34,7 +34,7 @@ CLIPPER_PSM=$(seth --to-address $CLIPPER_PSM_NO_CHECK)
 sleep 3
 
 # Deploy new Clip Calc
-CLIPPER_CALC_PSM=$(dapp create StairstepExponentialDecrease $GEM_JOIN_PSM $MCD_JOIN_DAI $MCD_VOW)
+CLIPPER_CALC_PSM=$(dapp create lib/dss/src/abaci.sol:StairstepExponentialDecrease)
 sleep 3
 
 # Set up permissions

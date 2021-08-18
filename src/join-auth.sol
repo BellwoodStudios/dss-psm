@@ -31,39 +31,48 @@ interface VatLike {
 contract AuthGemJoin {
     // --- Auth ---
     mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
+    function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
+    function deny(address usr) external auth { wards[usr] = 0; emit Deny(usr); }
     modifier auth {
         require(wards[msg.sender] == 1, "GemJoin/not-authorized");
         _;
     }
 
-    VatLike public vat;   // CDP Engine
-    bytes32 public ilk;   // Collateral Type
-    GemLike public gem;
-    uint    public dec;
+    VatLike public immutable vat;   // CDP Engine
+    bytes32 public immutable ilk;   // Collateral Type
+    GemLike public immutable gem;
+    uint    public immutable dec;
     uint    public live;  // Active Flag
+
+    // --- Events ---
+    event Rely(address indexed usr);
+    event Deny(address indexed usr);
+    event Join(address indexed urn, uint256 wad, address indexed msgSender);
+    event Exit(address indexed guy, uint256 wad);
 
     constructor(address vat_, bytes32 ilk_, address gem_) public {
         wards[msg.sender] = 1;
+        emit Rely(msg.sender);
         live = 1;
         vat = VatLike(vat_);
         ilk = ilk_;
         gem = GemLike(gem_);
-        dec = gem.decimals();
+        dec = GemLike(gem_).decimals();
     }
     function cage() external auth {
         live = 0;
     }
-    function join(address usr, uint wad, address _msgSender) external auth {
+    function join(address urn, uint wad, address msgSender) external auth {
         require(live == 1, "GemJoin/not-live");
         require(int(wad) >= 0, "GemJoin/overflow");
-        vat.slip(ilk, usr, int(wad));
-        require(gem.transferFrom(_msgSender, address(this), wad), "GemJoin/failed-transfer");
+        vat.slip(ilk, urn, int(wad));
+        require(gem.transferFrom(msgSender, address(this), wad), "GemJoin/failed-transfer");
+        emit Join(urn, wad, msgSender);
     }
-    function exit(address usr, uint wad) external {
+    function exit(address guy, uint wad) external {
         require(wad <= 2 ** 255, "GemJoin/overflow");
         vat.slip(ilk, msg.sender, -int(wad));
-        require(gem.transfer(usr, wad), "GemJoin/failed-transfer");
+        require(gem.transfer(guy, wad), "GemJoin/failed-transfer");
+        emit Exit(guy, wad);
     }
 }

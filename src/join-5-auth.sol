@@ -35,21 +35,28 @@ interface GemLike {
 contract AuthGemJoin5 {
     // --- Auth ---
     mapping (address => uint256) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
+    function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
+    function deny(address usr) external auth { wards[usr] = 0; emit Deny(usr); }
     modifier auth { require(wards[msg.sender] == 1); _; }
 
-    VatLike public vat;
-    bytes32 public ilk;
-    GemLike public gem;
-    uint256 public dec;
+    VatLike public immutable vat;
+    bytes32 public immutable ilk;
+    GemLike public immutable gem;
+    uint256 public immutable dec;
     uint256 public live;  // Access Flag
+
+    // --- Events ---
+    event Rely(address indexed usr);
+    event Deny(address indexed usr);
+    event Join(address indexed urn, uint256 wad, address indexed msgSender);
+    event Exit(address indexed guy, uint256 wad);
 
     constructor(address vat_, bytes32 ilk_, address gem_) public {
         gem = GemLike(gem_);
-        dec = gem.decimals();
-        require(dec < 18, "GemJoin5/decimals-18-or-higher");
+        uint256 dec_ = dec = GemLike(gem_).decimals();
+        require(dec_ < 18, "GemJoin5/decimals-18-or-higher");
         wards[msg.sender] = 1;
+        emit Rely(msg.sender);
         live = 1;
         vat = VatLike(vat_);
         ilk = ilk_;
@@ -63,12 +70,13 @@ contract AuthGemJoin5 {
         require(y == 0 || (z = x * y) / y == x, "GemJoin5/overflow");
     }
 
-    function join(address urn, uint256 wad, address _msgSender) external auth {
+    function join(address urn, uint256 wad, address msgSender) external auth {
         require(live == 1, "GemJoin5/not-live");
         uint256 wad18 = mul(wad, 10 ** (18 - dec));
         require(int256(wad18) >= 0, "GemJoin5/overflow");
         vat.slip(ilk, urn, int256(wad18));
-        require(gem.transferFrom(_msgSender, address(this), wad), "GemJoin5/failed-transfer");
+        require(gem.transferFrom(msgSender, address(this), wad), "GemJoin5/failed-transfer");
+        emit Join(urn, wad, msgSender);
     }
 
     function exit(address guy, uint256 wad) external {
@@ -76,5 +84,6 @@ contract AuthGemJoin5 {
         require(int256(wad18) >= 0, "GemJoin5/overflow");
         vat.slip(ilk, msg.sender, -int256(wad18));
         require(gem.transfer(guy, wad), "GemJoin5/failed-transfer");
+        emit Exit(guy, wad);
     }
 }
