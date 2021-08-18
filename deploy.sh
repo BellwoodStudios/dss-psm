@@ -34,8 +34,8 @@ CLIPPER_PSM=$(seth --to-address $CLIPPER_PSM_NO_CHECK)
 sleep 3
 
 # Deploy new Clip Calc
-CLIPPER_CALC_PSM=$(dapp create lib/dss/src/abaci.sol:StairstepExponentialDecrease)
-sleep 3
+#CLIPPER_CALC_PSM=$(dapp create lib/dss/src/abaci.sol:StairstepExponentialDecrease)
+#sleep 3
 
 # Set up permissions
 echo "Setting up permissions..."
@@ -52,11 +52,12 @@ sleep 3
 seth send $PSM 'deny(address)' $ETH_FROM
 sleep 3
 
-seth send $CLIPPER_CALC_PSM 'rely(address)' $MCD_PAUSE_PROXY
-sleep 3
-seth send $CLIPPER_CALC_PSM 'deny(address)' $ETH_FROM
+#seth send $CLIPPER_CALC_PSM 'rely(address)' $MCD_PAUSE_PROXY
+#sleep 3
+#seth send $CLIPPER_CALC_PSM 'deny(address)' $ETH_FROM
+#sleep 3
 
 echo "GEM_JOIN=$GEM_JOIN_PSM"
 echo "PSM=$PSM"
 echo "CLIPPER=$CLIPPER_PSM"
-echo "CLIPPER_CALC=$CLIPPER_CALC_PSM"
+#echo "CLIPPER_CALC=$CLIPPER_CALC_PSM"
