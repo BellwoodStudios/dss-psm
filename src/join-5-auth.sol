@@ -18,9 +18,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity ^0.6.7;
-
-import "dss/lib.sol";
+pragma solidity ^0.6.12;
 
 interface VatLike {
     function slip(bytes32, address, int256) external;
@@ -34,11 +32,11 @@ interface GemLike {
 
 // Authed GemJoin for a token that has a lower precision than 18 and it has decimals (like USDC)
 
-contract AuthGemJoin5 is LibNote {
+contract AuthGemJoin5 {
     // --- Auth ---
     mapping (address => uint256) public wards;
-    function rely(address usr) external note auth { wards[usr] = 1; }
-    function deny(address usr) external note auth { wards[usr] = 0; }
+    function rely(address usr) external auth { wards[usr] = 1; }
+    function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth { require(wards[msg.sender] == 1); _; }
 
     VatLike public vat;
@@ -57,7 +55,7 @@ contract AuthGemJoin5 is LibNote {
         ilk = ilk_;
     }
 
-    function cage() external note auth {
+    function cage() external auth {
         live = 0;
     }
 
@@ -65,7 +63,7 @@ contract AuthGemJoin5 is LibNote {
         require(y == 0 || (z = x * y) / y == x, "GemJoin5/overflow");
     }
 
-    function join(address urn, uint256 wad, address _msgSender) external note auth {
+    function join(address urn, uint256 wad, address _msgSender) external auth {
         require(live == 1, "GemJoin5/not-live");
         uint256 wad18 = mul(wad, 10 ** (18 - dec));
         require(int256(wad18) >= 0, "GemJoin5/overflow");
@@ -73,7 +71,7 @@ contract AuthGemJoin5 is LibNote {
         require(gem.transferFrom(_msgSender, address(this), wad), "GemJoin5/failed-transfer");
     }
 
-    function exit(address guy, uint256 wad) external note {
+    function exit(address guy, uint256 wad) external {
         uint256 wad18 = mul(wad, 10 ** (18 - dec));
         require(int256(wad18) >= 0, "GemJoin5/overflow");
         vat.slip(ilk, msg.sender, -int256(wad18));

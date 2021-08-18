@@ -33,6 +33,10 @@ CLIPPER_PSM_NO_CHECK=$(TX=$(seth send $CLIP_FAB 'newClip(address,address,address
 CLIPPER_PSM=$(seth --to-address $CLIPPER_PSM_NO_CHECK)
 sleep 3
 
+# Deploy new Clip Calc
+CLIPPER_CALC_PSM=$(dapp create StairstepExponentialDecrease $GEM_JOIN_PSM $MCD_JOIN_DAI $MCD_VOW)
+sleep 3
+
 # Set up permissions
 echo "Setting up permissions..."
 
@@ -46,8 +50,13 @@ sleep 3
 seth send $PSM 'rely(address)' $MCD_PAUSE_PROXY
 sleep 3
 seth send $PSM 'deny(address)' $ETH_FROM
+sleep 3
+
+seth send $CLIPPER_CALC_PSM 'rely(address)' $MCD_PAUSE_PROXY
+sleep 3
+seth send $CLIPPER_CALC_PSM 'deny(address)' $ETH_FROM
 
 echo "GEM_JOIN=$GEM_JOIN_PSM"
 echo "PSM=$PSM"
 echo "CLIPPER=$CLIPPER_PSM"
-echo "CLIPPER_CALC=$CLIPPER_PSM"
+echo "CLIPPER_CALC=$CLIPPER_CALC_PSM"
