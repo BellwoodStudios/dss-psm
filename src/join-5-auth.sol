@@ -48,6 +48,7 @@ contract AuthGemJoin5 {
     // --- Events ---
     event Rely(address indexed usr);
     event Deny(address indexed usr);
+    event Cage();
     event Join(address indexed urn, uint256 wad, address indexed msgSender);
     event Exit(address indexed guy, uint256 wad);
 
@@ -64,6 +65,7 @@ contract AuthGemJoin5 {
 
     function cage() external auth {
         live = 0;
+        emit Cage();
     }
 
     function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {

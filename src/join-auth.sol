@@ -47,6 +47,7 @@ contract AuthGemJoin {
     // --- Events ---
     event Rely(address indexed usr);
     event Deny(address indexed usr);
+    event Cage();
     event Join(address indexed urn, uint256 wad, address indexed msgSender);
     event Exit(address indexed guy, uint256 wad);
 
@@ -61,6 +62,7 @@ contract AuthGemJoin {
     }
     function cage() external auth {
         live = 0;
+        emit Cage();
     }
     function join(address urn, uint wad, address msgSender) external auth {
         require(live == 1, "GemJoin/not-live");
